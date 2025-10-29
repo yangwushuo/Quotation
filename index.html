@@ -1,20 +1,17 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1.0"
-    />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>报价方案生成器</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <style>
-      @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&display=swap');
+      @import url("https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&display=swap");
 
       body {
-        font-family: 'Noto Sans SC', sans-serif;
+        font-family: "Noto Sans SC", sans-serif;
       }
 
       .page {
@@ -28,12 +25,20 @@
         padding: 20px 25px;
         box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
         box-sizing: border-box;
+        position: absolute;
+        cursor: move;
+        user-select: none;
+      }
+
+      .page:active {
+        cursor: grabbing;
       }
 
       .preview-container {
-        transform: scale(0.7);
-        transform-origin: top left;
-        width: calc(210mm / 0.7);
+        position: relative;
+        width: 100%;
+        height: 100%;
+        min-height: 100%;
       }
 
       @media print {
@@ -62,16 +67,21 @@
     </style>
   </head>
   <body>
-    <div
-      id="app"
-      class="flex h-screen bg-gray-50"
-    >
+    <div id="app" class="flex h-screen bg-gray-50">
       <!-- 左侧预览区 -->
       <div class="scrollbar-thin flex-1 overflow-auto p-8">
-        <div class="preview-container">
+        <div class="preview-container" @wheel="handleWheel">
           <div
             class="page"
             id="pdf-content"
+            @mousedown="startDrag"
+            :style="{
+              left: pageX + 'px',
+              top: pageY + 'px',
+              transform: 'scale(' + scale + ')',
+              transformOrigin: 'top left',
+              cursor: isDragging ? 'grabbing' : 'move'
+            }"
           >
             <!-- 标题 -->
             <div class="mb-3 text-center">
@@ -263,11 +273,7 @@
                   </div>
                 </div>
                 <div class="flex items-center justify-center gap-1">
-                  <svg
-                    class="h-3 w-3"
-                    viewBox="0 0 24 24"
-                    fill="currentColor"
-                  >
+                  <svg class="h-3 w-3" viewBox="0 0 24 24" fill="currentColor">
                     <path
                       d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"
                     />
@@ -363,10 +369,7 @@
                 @change="handleQRCodeUpload"
                 class="w-full text-sm file:mr-4 file:rounded file:border-0 file:bg-blue-50 file:px-4 file:py-2 file:text-sm file:font-medium file:text-blue-700 hover:file:bg-blue-100"
               />
-              <div
-                v-if="qrCodeImage"
-                class="flex items-center gap-2"
-              >
+              <div v-if="qrCodeImage" class="flex items-center gap-2">
                 <img
                   :src="qrCodeImage"
                   alt="预览"
@@ -470,10 +473,7 @@
         </div>
 
         <!-- 已添加的行列表 -->
-        <div
-          v-if="tableRows.length > 0"
-          class="mb-6 space-y-2"
-        >
+        <div v-if="tableRows.length > 0" class="mb-6 space-y-2">
           <h3 class="font-semibold text-gray-700">
             已添加项目 ({{ tableRows.length }})
           </h3>
@@ -557,87 +557,99 @@
     </div>
 
     <script>
-      const { createApp } = Vue
+      const { createApp } = Vue;
 
       createApp({
         data() {
           return {
             // 基础信息
-            projectName: '某某项目',
-            quoteDate: '2025 年 6 月 6 日',
-            validUntil: '2025 年 7 月 6 日',
-            clientName: '某某公司',
-            designerName: '@某某设计师',
-            qrCodeImage: '',
+            projectName: "某某项目",
+            quoteDate: "2025 年 6 月 6 日",
+            validUntil: "2025 年 7 月 6 日",
+            clientName: "某某公司",
+            designerName: "@某某设计师",
+            qrCodeImage: "",
 
             // 表格行数据
             tableRows: [
               {
-                workItem: '一级页面',
+                workItem: "一级页面",
                 amount: 1400,
                 originalPrice: 2000,
-                unit: '元/项',
-                remarks: '首页',
-                tips: '整体工时安排：<br />① 3 天设计 UI 视觉方案 PPT 确定页面风格；<br />② 确定风格后 5 天内设计完成并且切图交付；',
+                unit: "元/项",
+                remarks: "首页",
+                tips: "整体工时安排：<br />① 3 天设计 UI 视觉方案 PPT 确定页面风格；<br />② 确定风格后 5 天内设计完成并且切图交付；",
               },
               {
-                workItem: '二级页面',
+                workItem: "二级页面",
                 amount: 1470,
                 originalPrice: 2100,
-                unit: '元/项',
-                remarks: '详情页、个人页',
-                tips: '',
+                unit: "元/项",
+                remarks: "详情页、个人页",
+                tips: "",
               },
               {
-                workItem: '次级页面',
+                workItem: "次级页面",
                 amount: 1000,
                 originalPrice: 1250,
-                unit: '元/项',
-                remarks: '欢迎页、引导页 4P、',
-                tips: '',
+                unit: "元/项",
+                remarks: "欢迎页、引导页 4P、",
+                tips: "",
               },
             ],
 
             // 新行输入
             newRow: {
-              workItem: '',
+              workItem: "",
               amount: 0,
               originalPrice: 0,
-              unit: '元/项',
-              remarks: '',
-              tips: '',
+              unit: "元/项",
+              remarks: "",
+              tips: "",
             },
 
             // 汇总信息
             discountRate: 91,
-            summaryNote: '新客优惠（报价金额 91 折）',
+            summaryNote: "新客优惠（报价金额 91 折）",
 
             // PDF生成状态
             isGenerating: false,
-          }
+
+            // 拖拽相关
+            isDragging: false,
+            dragStartX: 0,
+            dragStartY: 0,
+            pageX: 0,
+            pageY: 0,
+
+            // 缩放相关
+            scale: 0.7,
+            minScale: 0.3,
+            maxScale: 3,
+          };
         },
         computed: {
           totalAmount() {
             return this.tableRows.reduce(
               (sum, row) => sum + Number(row.amount || 0),
               0
-            )
+            );
           },
           totalOriginalPrice() {
             return this.tableRows.reduce(
               (sum, row) => sum + Number(row.originalPrice || 0),
               0
-            )
+            );
           },
           discountedTotal() {
-            return Math.round(this.totalAmount * (this.discountRate / 100))
+            return Math.round(this.totalAmount * (this.discountRate / 100));
           },
         },
         methods: {
           addRow() {
             if (!this.newRow.workItem || !this.newRow.amount) {
-              alert('请至少填写工作项和金额')
-              return
+              alert("请至少填写工作项和金额");
+              return;
             }
 
             this.tableRows.push({
@@ -647,93 +659,222 @@
               unit: this.newRow.unit,
               remarks: this.newRow.remarks,
               tips: this.newRow.tips,
-            })
+            });
 
             // 重置表单
             this.newRow = {
-              workItem: '',
+              workItem: "",
               amount: 0,
               originalPrice: 0,
-              unit: '元/项',
-              remarks: '',
-              tips: '',
-            }
+              unit: "元/项",
+              remarks: "",
+              tips: "",
+            };
           },
           removeRow(index) {
-            if (confirm('确定删除这个工作项吗？')) {
-              this.tableRows.splice(index, 1)
+            if (confirm("确定删除这个工作项吗？")) {
+              this.tableRows.splice(index, 1);
             }
           },
           handleQRCodeUpload(event) {
-            const file = event.target.files[0]
-            if (!file) return
+            const file = event.target.files[0];
+            if (!file) return;
 
             // 验证文件类型
-            if (!file.type.startsWith('image/')) {
-              alert('请选择图片文件')
-              return
+            if (!file.type.startsWith("image/")) {
+              alert("请选择图片文件");
+              return;
             }
 
             // 验证文件大小（限制为5MB）
             if (file.size > 5 * 1024 * 1024) {
-              alert('图片大小不能超过5MB')
-              return
+              alert("图片大小不能超过5MB");
+              return;
             }
 
             // 读取文件并转换为base64
-            const reader = new FileReader()
+            const reader = new FileReader();
             reader.onload = (e) => {
-              this.qrCodeImage = e.target.result
-            }
+              this.qrCodeImage = e.target.result;
+            };
             reader.onerror = () => {
-              alert('图片读取失败，请重试')
-            }
-            reader.readAsDataURL(file)
+              alert("图片读取失败，请重试");
+            };
+            reader.readAsDataURL(file);
           },
           removeQRCode() {
-            if (confirm('确定删除二维码图片吗？')) {
-              this.qrCodeImage = ''
+            if (confirm("确定删除二维码图片吗？")) {
+              this.qrCodeImage = "";
               // 清空文件输入
-              const fileInput = document.querySelector('input[type="file"]')
+              const fileInput = document.querySelector('input[type="file"]');
               if (fileInput) {
-                fileInput.value = ''
+                fileInput.value = "";
               }
             }
           },
           async generatePDF() {
-            this.isGenerating = true
+            this.isGenerating = true;
 
             try {
-              const element = document.getElementById('pdf-content')
+              const element = document.getElementById("pdf-content");
+              const container = element.parentElement;
+
+              // 创建临时的导出容器
+              const exportWrapper = document.createElement("div");
+              exportWrapper.style.cssText = `
+                position: fixed;
+                left: -9999px;
+                top: 0;
+                width: 210mm;
+                background: white;
+                z-index: 9999;
+              `;
+              document.body.appendChild(exportWrapper);
+
+              // 保存原始父元素和样式
+              const originalParent = element.parentElement;
+              const originalStyles = {
+                transform: element.style.transform,
+                position: element.style.position,
+                left: element.style.left,
+                top: element.style.top,
+                cursor: element.style.cursor,
+                userSelect: element.style.userSelect,
+                margin: element.style.margin,
+              };
+
+              // 将元素移动到导出容器并重置样式
+              exportWrapper.appendChild(element);
+              element.style.transform = "none";
+              element.style.position = "relative";
+              element.style.left = "auto";
+              element.style.top = "auto";
+              element.style.cursor = "default";
+              element.style.userSelect = "auto";
+              element.style.margin = "0";
+
+              // 等待DOM更新
+              await new Promise((resolve) => setTimeout(resolve, 100));
+
               const opt = {
                 margin: [10, 10, 10, 10],
                 filename: `${this.projectName}-报价方案.pdf`,
-                image: { type: 'jpeg', quality: 0.98 },
+                image: { type: "jpeg", quality: 0.98 },
                 html2canvas: {
                   scale: 2,
                   useCORS: true,
                   logging: false,
                   letterRendering: true,
+                  backgroundColor: "#ffffff",
                 },
                 jsPDF: {
-                  unit: 'mm',
-                  format: 'a4',
-                  orientation: 'portrait',
+                  unit: "mm",
+                  format: "a4",
+                  orientation: "portrait",
                   compress: true,
                 },
-                pagebreak: { mode: 'avoid-all' },
-              }
+                pagebreak: { mode: "avoid-all" },
+              };
 
-              await html2pdf().set(opt).from(element).save()
+              await html2pdf().set(opt).from(element).save();
+
+              // 将元素移回原位置并恢复样式
+              originalParent.appendChild(element);
+              Object.assign(element.style, originalStyles);
+
+              // 删除临时容器
+              document.body.removeChild(exportWrapper);
             } catch (error) {
-              console.error('PDF生成失败:', error)
-              alert('PDF生成失败，请重试')
+              console.error("PDF生成失败:", error);
+              alert("PDF生成失败，请重试");
+
+              // 确保清理
+              const exportWrapper = document.querySelector(
+                'div[style*="left: -9999px"]'
+              );
+              if (exportWrapper) {
+                const element = document.getElementById("pdf-content");
+                const container = document.querySelector(".preview-container");
+                if (element && container) {
+                  container.appendChild(element);
+                }
+                document.body.removeChild(exportWrapper);
+              }
             } finally {
-              this.isGenerating = false
+              this.isGenerating = false;
             }
           },
+          // 拖拽相关方法
+          startDrag(event) {
+            this.isDragging = true;
+            this.dragStartX = event.clientX - this.pageX;
+            this.dragStartY = event.clientY - this.pageY;
+
+            document.addEventListener("mousemove", this.onDrag);
+            document.addEventListener("mouseup", this.stopDrag);
+
+            event.preventDefault();
+          },
+          onDrag(event) {
+            if (!this.isDragging) return;
+
+            this.pageX = event.clientX - this.dragStartX;
+            this.pageY = event.clientY - this.dragStartY;
+          },
+          stopDrag() {
+            this.isDragging = false;
+            document.removeEventListener("mousemove", this.onDrag);
+            document.removeEventListener("mouseup", this.stopDrag);
+          },
+          // 滚轮缩放
+          handleWheel(event) {
+            event.preventDefault();
+
+            const delta = event.deltaY > 0 ? -0.1 : 0.1;
+            const newScale = Math.min(
+              this.maxScale,
+              Math.max(this.minScale, this.scale + delta)
+            );
+
+            // 计算鼠标位置相对于纸张的坐标
+            const rect = event.currentTarget
+              .querySelector(".page")
+              .getBoundingClientRect();
+            const mouseX = event.clientX - rect.left;
+            const mouseY = event.clientY - rect.top;
+
+            // 根据鼠标位置调整纸张位置，实现以鼠标为中心缩放
+            const scaleChange = newScale / this.scale;
+            this.pageX =
+              event.clientX -
+              mouseX * scaleChange -
+              (event.clientX - rect.left - mouseX);
+            this.pageY =
+              event.clientY -
+              mouseY * scaleChange -
+              (event.clientY - rect.top - mouseY);
+
+            this.scale = newScale;
+          },
         },
-      }).mount('#app')
+        mounted() {
+          // 页面加载后自动居中纸张
+          this.$nextTick(() => {
+            const container = document.querySelector(".preview-container");
+            const page = document.getElementById("pdf-content");
+
+            if (container && page) {
+              const containerRect = container.getBoundingClientRect();
+              const pageWidth = 210 * 3.7795275591; // 210mm转换为px
+              const pageHeight = page.offsetHeight;
+
+              // 计算居中位置
+              this.pageX = (containerRect.width - pageWidth * this.scale) / 2;
+              this.pageY = 50; // 顶部留一些边距
+            }
+          });
+        },
+      }).mount("#app");
     </script>
   </body>
 </html>
