@@ -1,0 +1,739 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0"
+    />
+    <title>报价方案生成器</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&display=swap');
+
+      body {
+        font-family: 'Noto Sans SC', sans-serif;
+      }
+
+      .page {
+        width: 210mm;
+        min-width: 210mm;
+        max-width: 210mm;
+        height: auto;
+        max-height: none;
+        margin: 0 auto;
+        background: white;
+        padding: 20px 25px;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        box-sizing: border-box;
+      }
+
+      .preview-container {
+        transform: scale(0.7);
+        transform-origin: top left;
+        width: calc(210mm / 0.7);
+      }
+
+      @media print {
+        .page {
+          box-shadow: none;
+          margin: 0;
+        }
+      }
+
+      .scrollbar-thin::-webkit-scrollbar {
+        width: 6px;
+      }
+
+      .scrollbar-thin::-webkit-scrollbar-track {
+        background: #f1f1f1;
+      }
+
+      .scrollbar-thin::-webkit-scrollbar-thumb {
+        background: #888;
+        border-radius: 3px;
+      }
+
+      .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+        background: #555;
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      id="app"
+      class="flex h-screen bg-gray-50"
+    >
+      <!-- 左侧预览区 -->
+      <div class="scrollbar-thin flex-1 overflow-auto p-8">
+        <div class="preview-container">
+          <div
+            class="page"
+            id="pdf-content"
+          >
+            <!-- 标题 -->
+            <div class="mb-3 text-center">
+              <h1 class="mb-2 text-xl font-bold">
+                {{ projectName || '项目名称' }}设计需求报价方案
+              </h1>
+              <div class="mb-2 flex justify-between text-xs text-gray-600">
+                <div>
+                  报价时间：<span class="font-medium"
+                    >{{ quoteDate || '2025年6月6日' }}</span
+                  >
+                  <span class="text-gray-400"
+                    >（有效期至 {{ validUntil || '2025年7月6日' }}）</span
+                  >
+                </div>
+                <div>
+                  客户：<span class="font-medium"
+                    >{{ clientName || '客户名称' }}</span
+                  >
+                </div>
+              </div>
+            </div>
+
+            <!-- 主表格 -->
+            <div class="mb-3 border-2 border-gray-800">
+              <!-- 表头 -->
+              <div class="grid grid-cols-12 border-b-2 border-gray-800">
+                <div class="col-span-2 border-r border-gray-800 p-2 font-bold">
+                  工作项
+                </div>
+                <div
+                  class="col-span-1 border-r border-gray-800 p-2 text-center font-bold"
+                >
+                  金额
+                </div>
+                <div
+                  class="col-span-1 border-r border-gray-800 p-2 text-center font-bold"
+                >
+                  原价
+                </div>
+                <div
+                  class="col-span-1 border-r border-gray-800 p-2 text-center font-bold"
+                >
+                  单位
+                </div>
+                <div class="col-span-3 border-r border-gray-800 p-2 font-bold">
+                  备注
+                </div>
+                <div class="col-span-4 p-2 font-bold">提示</div>
+              </div>
+
+              <!-- UI 类设计标题 -->
+              <div
+                class="border-b border-gray-800 bg-gray-50 p-1.5 text-sm font-bold"
+              >
+                UI 类设计
+              </div>
+
+              <!-- 动态表格行 -->
+              <div
+                v-for="(row, index) in tableRows"
+                :key="index"
+                class="grid grid-cols-12 border-b border-gray-800"
+              >
+                <div class="col-span-2 border-r border-gray-800 p-1.5 text-sm">
+                  {{ row.workItem }}
+                </div>
+                <div
+                  class="col-span-1 border-r border-gray-800 p-1.5 text-center text-sm font-bold"
+                >
+                  {{ row.amount }}
+                </div>
+                <div
+                  class="col-span-1 border-r border-gray-800 p-1.5 text-center text-sm text-gray-400 line-through"
+                >
+                  {{ row.originalPrice }}
+                </div>
+                <div
+                  class="col-span-1 border-r border-gray-800 p-1.5 text-center text-xs"
+                >
+                  {{ row.unit }}
+                </div>
+                <div class="col-span-3 border-r border-gray-800 p-1.5 text-sm">
+                  {{ row.remarks }}
+                </div>
+                <div
+                  class="col-span-4 p-1.5 text-xs leading-relaxed"
+                  v-html="row.tips"
+                ></div>
+              </div>
+
+              <!-- 空行 -->
+              <div class="border-b-2 border-gray-800 p-3"></div>
+
+              <!-- 报价汇总 -->
+              <div class="grid grid-cols-12">
+                <div
+                  class="col-span-2 border-r border-gray-800 p-1.5 text-sm font-bold"
+                >
+                  报价汇总
+                </div>
+                <div
+                  class="col-span-2 border-r border-gray-800 p-1.5 text-center"
+                >
+                  <div class="text-base font-bold text-red-600">
+                    $ {{ totalAmount }}
+                  </div>
+                  <div class="text-xs text-gray-400 line-through">
+                    ({{ discountedTotal }})
+                  </div>
+                </div>
+                <div
+                  class="col-span-1 border-r border-gray-800 p-1.5 text-center text-sm text-gray-400 line-through"
+                >
+                  {{ totalOriginalPrice }}
+                </div>
+                <div
+                  class="col-span-1 border-r border-gray-800 p-1.5 text-center text-xs"
+                >
+                  元
+                </div>
+                <div class="col-span-6 p-1.5">
+                  <span
+                    class="inline-flex items-center rounded bg-orange-100 px-2 py-1 text-xs text-orange-600"
+                  >
+                    {{ summaryNote || '新客优惠' }}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <!-- 交付标准 -->
+            <div class="mb-2">
+              <div class="mb-1 text-sm font-bold">交付标准：</div>
+              <div class="space-y-0.5 pl-4 text-xs leading-relaxed">
+                <div>
+                  ① 交付 PPT 形式的 UI 界面设计方案 2
+                  套，以首页+二级页面为主要效果展示（PPT 格式）
+                </div>
+                <div>
+                  ② 确认风格后根据风格设计方案 PPT 制作设计图（交付 PSD
+                  格式，并上传蓝湖-开发设计在线协同工具），并完成切图工作后交付（并且交付源文件）
+                </div>
+              </div>
+            </div>
+
+            <!-- 合作须知 -->
+            <div class="mb-4">
+              <div class="mb-1 text-sm font-bold">合作须知：</div>
+              <div class="space-y-0.5 pl-4 text-xs leading-relaxed">
+                <div>
+                  ① 需预付 50%作为定金启动项目（即 {{ Math.round(totalAmount *
+                  0.5) }}），PPT 方案后不满意收取整体金额的 10%作为方案费；（即
+                  {{ Math.round(totalAmount * 0.1) }} 元）
+                </div>
+                <div>② 小修小改能帮吖杜一定会帮忙，请放心大胆提出免费的；</div>
+              </div>
+            </div>
+
+            <!-- 底部备注 -->
+            <div class="mb-3 space-y-0.5 text-xs text-gray-500">
+              <div>1、以上报价有效期 1 个月。</div>
+              <div>2、合作确认需支付50%作为定金启动项目。</div>
+              <div>
+                3、平面设计不低于2套的设计方案。UI界面则以首页与一二级页面设计不低于2套界面方案。
+              </div>
+              <div class="ml-4">均以PPT形式展示方案；</div>
+            </div>
+
+            <!-- 底部信息 -->
+            <div class="flex items-end justify-between">
+              <div>
+                <div class="mb-2 text-base font-bold">UI设计</div>
+                <div class="text-xs text-gray-500 uppercase">UI DESIGN</div>
+              </div>
+              <div class="text-center">
+                <div class="mb-2">
+                  <img
+                    v-if="qrCodeImage"
+                    :src="qrCodeImage"
+                    alt="QR Code"
+                    class="h-20 w-20 object-cover"
+                  />
+                  <div
+                    v-else
+                    class="flex h-20 w-20 items-center justify-center border-2 border-dashed border-gray-400 bg-gray-100 text-xs text-gray-400"
+                  >
+                    二维码
+                  </div>
+                </div>
+                <div class="flex items-center justify-center gap-1">
+                  <svg
+                    class="h-3 w-3"
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                  >
+                    <path
+                      d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"
+                    />
+                  </svg>
+                  <span class="text-xs"
+                    >{{ designerName || '@某某设计师' }}</span
+                  >
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 右侧操作区 -->
+      <div
+        class="scrollbar-thin w-96 overflow-auto border-l border-gray-200 bg-white p-6 shadow-lg"
+      >
+        <h2 class="mb-6 text-xl font-bold text-gray-800">报价方案编辑器</h2>
+
+        <!-- 基础信息 -->
+        <div class="mb-6 space-y-4 rounded-lg bg-gray-50 p-4">
+          <h3 class="font-semibold text-gray-700">基础信息</h3>
+
+          <div>
+            <label class="mb-1 block text-sm font-medium text-gray-600"
+              >项目名称</label
+            >
+            <input
+              v-model="projectName"
+              type="text"
+              placeholder="如：某某项目"
+              class="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+            />
+          </div>
+
+          <div>
+            <label class="mb-1 block text-sm font-medium text-gray-600"
+              >报价时间</label
+            >
+            <input
+              v-model="quoteDate"
+              type="text"
+              placeholder="2025年6月6日"
+              class="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+            />
+          </div>
+
+          <div>
+            <label class="mb-1 block text-sm font-medium text-gray-600"
+              >有效期至</label
+            >
+            <input
+              v-model="validUntil"
+              type="text"
+              placeholder="2025年7月6日"
+              class="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+            />
+          </div>
+
+          <div>
+            <label class="mb-1 block text-sm font-medium text-gray-600"
+              >客户名称</label
+            >
+            <input
+              v-model="clientName"
+              type="text"
+              placeholder="某某公司"
+              class="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+            />
+          </div>
+
+          <div>
+            <label class="mb-1 block text-sm font-medium text-gray-600"
+              >设计师名称</label
+            >
+            <input
+              v-model="designerName"
+              type="text"
+              placeholder="@某某设计师"
+              class="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+            />
+          </div>
+
+          <div>
+            <label class="mb-1 block text-sm font-medium text-gray-600"
+              >二维码图片</label
+            >
+            <div class="space-y-2">
+              <input
+                type="file"
+                accept="image/*"
+                @change="handleQRCodeUpload"
+                class="w-full text-sm file:mr-4 file:rounded file:border-0 file:bg-blue-50 file:px-4 file:py-2 file:text-sm file:font-medium file:text-blue-700 hover:file:bg-blue-100"
+              />
+              <div
+                v-if="qrCodeImage"
+                class="flex items-center gap-2"
+              >
+                <img
+                  :src="qrCodeImage"
+                  alt="预览"
+                  class="h-16 w-16 rounded border border-gray-300 object-cover"
+                />
+                <button
+                  @click="removeQRCode"
+                  class="rounded bg-red-500 px-2 py-1 text-xs text-white hover:bg-red-600"
+                >
+                  删除
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 添加表格行 -->
+        <div class="mb-6 space-y-4 rounded-lg bg-blue-50 p-4">
+          <h3 class="font-semibold text-gray-700">添加工作项</h3>
+
+          <div>
+            <label class="mb-1 block text-sm font-medium text-gray-600"
+              >工作项</label
+            >
+            <input
+              v-model="newRow.workItem"
+              type="text"
+              placeholder="如：一级页面"
+              class="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+            />
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="mb-1 block text-sm font-medium text-gray-600"
+                >金额</label
+              >
+              <input
+                v-model.number="newRow.amount"
+                type="number"
+                placeholder="1400"
+                class="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+              />
+            </div>
+
+            <div>
+              <label class="mb-1 block text-sm font-medium text-gray-600"
+                >原价</label
+              >
+              <input
+                v-model.number="newRow.originalPrice"
+                type="number"
+                placeholder="2000"
+                class="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label class="mb-1 block text-sm font-medium text-gray-600"
+              >单位</label
+            >
+            <input
+              v-model="newRow.unit"
+              type="text"
+              placeholder="元/项"
+              class="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+            />
+          </div>
+
+          <div>
+            <label class="mb-1 block text-sm font-medium text-gray-600"
+              >备注</label
+            >
+            <input
+              v-model="newRow.remarks"
+              type="text"
+              placeholder="首页"
+              class="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+            />
+          </div>
+
+          <div>
+            <label class="mb-1 block text-sm font-medium text-gray-600"
+              >提示</label
+            >
+            <textarea
+              v-model="newRow.tips"
+              placeholder="整体工时安排：<br />① 3天设计..."
+              rows="3"
+              class="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+            ></textarea>
+          </div>
+
+          <button
+            @click="addRow"
+            class="w-full rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700"
+          >
+            ➕ 添加到表格
+          </button>
+        </div>
+
+        <!-- 已添加的行列表 -->
+        <div
+          v-if="tableRows.length > 0"
+          class="mb-6 space-y-2"
+        >
+          <h3 class="font-semibold text-gray-700">
+            已添加项目 ({{ tableRows.length }})
+          </h3>
+          <div
+            v-for="(row, index) in tableRows"
+            :key="index"
+            class="flex items-center justify-between rounded bg-gray-50 p-3 text-sm"
+          >
+            <div class="flex-1">
+              <div class="font-medium">{{ row.workItem }}</div>
+              <div class="text-xs text-gray-500">
+                ¥{{ row.amount }} / {{ row.unit }}
+              </div>
+            </div>
+            <button
+              @click="removeRow(index)"
+              class="ml-2 rounded bg-red-500 px-2 py-1 text-xs text-white hover:bg-red-600"
+            >
+              删除
+            </button>
+          </div>
+        </div>
+
+        <!-- 汇总信息 -->
+        <div class="mb-6 space-y-4 rounded-lg bg-green-50 p-4">
+          <h3 class="font-semibold text-gray-700">汇总信息</h3>
+
+          <div class="space-y-2 text-sm">
+            <div class="flex justify-between">
+              <span class="text-gray-600">总金额：</span>
+              <span class="font-bold text-green-600">¥{{ totalAmount }}</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-gray-600">总原价：</span>
+              <span class="text-gray-400 line-through"
+                >¥{{ totalOriginalPrice }}</span
+              >
+            </div>
+          </div>
+
+          <div>
+            <label class="mb-1 block text-sm font-medium text-gray-600"
+              >折扣比例 (%)</label
+            >
+            <input
+              v-model.number="discountRate"
+              type="number"
+              placeholder="91"
+              min="0"
+              max="100"
+              class="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+            />
+            <div class="mt-1 text-xs text-gray-500">
+              折后金额：¥{{ discountedTotal }}
+            </div>
+          </div>
+
+          <div>
+            <label class="mb-1 block text-sm font-medium text-gray-600"
+              >汇总提示</label
+            >
+            <input
+              v-model="summaryNote"
+              type="text"
+              placeholder="新客优惠（报价金额 91 折）"
+              class="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+            />
+          </div>
+        </div>
+
+        <!-- 生成PDF按钮 -->
+        <button
+          @click="generatePDF"
+          :disabled="isGenerating"
+          class="w-full rounded bg-gradient-to-r from-purple-600 to-pink-600 px-4 py-3 font-medium text-white shadow-lg transition hover:from-purple-700 hover:to-pink-700 disabled:opacity-50"
+        >
+          <span v-if="!isGenerating">📄 生成 PDF</span>
+          <span v-else>⏳ 生成中...</span>
+        </button>
+      </div>
+    </div>
+
+    <script>
+      const { createApp } = Vue
+
+      createApp({
+        data() {
+          return {
+            // 基础信息
+            projectName: '某某项目',
+            quoteDate: '2025 年 6 月 6 日',
+            validUntil: '2025 年 7 月 6 日',
+            clientName: '某某公司',
+            designerName: '@某某设计师',
+            qrCodeImage: '',
+
+            // 表格行数据
+            tableRows: [
+              {
+                workItem: '一级页面',
+                amount: 1400,
+                originalPrice: 2000,
+                unit: '元/项',
+                remarks: '首页',
+                tips: '整体工时安排：<br />① 3 天设计 UI 视觉方案 PPT 确定页面风格；<br />② 确定风格后 5 天内设计完成并且切图交付；',
+              },
+              {
+                workItem: '二级页面',
+                amount: 1470,
+                originalPrice: 2100,
+                unit: '元/项',
+                remarks: '详情页、个人页',
+                tips: '',
+              },
+              {
+                workItem: '次级页面',
+                amount: 1000,
+                originalPrice: 1250,
+                unit: '元/项',
+                remarks: '欢迎页、引导页 4P、',
+                tips: '',
+              },
+            ],
+
+            // 新行输入
+            newRow: {
+              workItem: '',
+              amount: 0,
+              originalPrice: 0,
+              unit: '元/项',
+              remarks: '',
+              tips: '',
+            },
+
+            // 汇总信息
+            discountRate: 91,
+            summaryNote: '新客优惠（报价金额 91 折）',
+
+            // PDF生成状态
+            isGenerating: false,
+          }
+        },
+        computed: {
+          totalAmount() {
+            return this.tableRows.reduce(
+              (sum, row) => sum + Number(row.amount || 0),
+              0
+            )
+          },
+          totalOriginalPrice() {
+            return this.tableRows.reduce(
+              (sum, row) => sum + Number(row.originalPrice || 0),
+              0
+            )
+          },
+          discountedTotal() {
+            return Math.round(this.totalAmount * (this.discountRate / 100))
+          },
+        },
+        methods: {
+          addRow() {
+            if (!this.newRow.workItem || !this.newRow.amount) {
+              alert('请至少填写工作项和金额')
+              return
+            }
+
+            this.tableRows.push({
+              workItem: this.newRow.workItem,
+              amount: Number(this.newRow.amount),
+              originalPrice: Number(this.newRow.originalPrice),
+              unit: this.newRow.unit,
+              remarks: this.newRow.remarks,
+              tips: this.newRow.tips,
+            })
+
+            // 重置表单
+            this.newRow = {
+              workItem: '',
+              amount: 0,
+              originalPrice: 0,
+              unit: '元/项',
+              remarks: '',
+              tips: '',
+            }
+          },
+          removeRow(index) {
+            if (confirm('确定删除这个工作项吗？')) {
+              this.tableRows.splice(index, 1)
+            }
+          },
+          handleQRCodeUpload(event) {
+            const file = event.target.files[0]
+            if (!file) return
+
+            // 验证文件类型
+            if (!file.type.startsWith('image/')) {
+              alert('请选择图片文件')
+              return
+            }
+
+            // 验证文件大小（限制为5MB）
+            if (file.size > 5 * 1024 * 1024) {
+              alert('图片大小不能超过5MB')
+              return
+            }
+
+            // 读取文件并转换为base64
+            const reader = new FileReader()
+            reader.onload = (e) => {
+              this.qrCodeImage = e.target.result
+            }
+            reader.onerror = () => {
+              alert('图片读取失败，请重试')
+            }
+            reader.readAsDataURL(file)
+          },
+          removeQRCode() {
+            if (confirm('确定删除二维码图片吗？')) {
+              this.qrCodeImage = ''
+              // 清空文件输入
+              const fileInput = document.querySelector('input[type="file"]')
+              if (fileInput) {
+                fileInput.value = ''
+              }
+            }
+          },
+          async generatePDF() {
+            this.isGenerating = true
+
+            try {
+              const element = document.getElementById('pdf-content')
+              const opt = {
+                margin: [10, 10, 10, 10],
+                filename: `${this.projectName}-报价方案.pdf`,
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: {
+                  scale: 2,
+                  useCORS: true,
+                  logging: false,
+                  letterRendering: true,
+                },
+                jsPDF: {
+                  unit: 'mm',
+                  format: 'a4',
+                  orientation: 'portrait',
+                  compress: true,
+                },
+                pagebreak: { mode: 'avoid-all' },
+              }
+
+              await html2pdf().set(opt).from(element).save()
+            } catch (error) {
+              console.error('PDF生成失败:', error)
+              alert('PDF生成失败，请重试')
+            } finally {
+              this.isGenerating = false
+            }
+          },
+        },
+      }).mount('#app')
+    </script>
+  </body>
+</html>
